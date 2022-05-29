@@ -1,59 +1,55 @@
-#!/usr/bin/env python
-
-from __future__ import unicode_literals
-
+#!/usr/bin/env python3
 # Allow direct execution
+import hashlib
+import json
 import os
+import socket
 import sys
 import unittest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from test.helper import (
     assertGreaterEqual,
+    expect_info_dict,
     expect_warnings,
     get_params,
     gettestcases,
-    expect_info_dict,
-    try_rm,
+    is_download_test,
     report_warning,
+    try_rm,
 )
 
-
-import hashlib
-import io
-import json
-import socket
-
-import youtube_dl.YoutubeDL
-from youtube_dl.compat import (
+import yt_dlp.YoutubeDL
+from yt_dlp.compat import (
     compat_http_client,
-    compat_urllib_error,
     compat_HTTPError,
+    compat_urllib_error,
 )
-from youtube_dl.utils import (
+from yt_dlp.extractor import get_info_extractor
+from yt_dlp.utils import (
     DownloadError,
     ExtractorError,
-    format_bytes,
     UnavailableVideoError,
+    format_bytes,
 )
-from youtube_dl.extractor import get_info_extractor
 
 RETRIES = 3
 
 
-class YoutubeDL(youtube_dl.YoutubeDL):
+class YoutubeDL(yt_dlp.YoutubeDL):
     def __init__(self, *args, **kwargs):
         self.to_stderr = self.to_screen
         self.processed_info_dicts = []
-        super(YoutubeDL, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def report_warning(self, message):
         # Don't accept warnings during tests
         raise ExtractorError(message)
 
     def process_info(self, info_dict):
-        self.processed_info_dicts.append(info_dict)
-        return super(YoutubeDL, self).process_info(info_dict)
+        self.processed_info_dicts.append(info_dict.copy())
+        return super().process_info(info_dict)
 
 
 def _file_md5(fn):
@@ -64,6 +60,7 @@ def _file_md5(fn):
 defs = gettestcases()
 
 
+@is_download_test
 class TestDownload(unittest.TestCase):
     # Parallel testing in nosetests. See
     # http://nose.readthedocs.org/en/latest/doc_tests/test_multiprocess/multiprocess.html
@@ -71,12 +68,14 @@ class TestDownload(unittest.TestCase):
 
     maxDiff = None
 
+    COMPLETED_TESTS = {}
+
     def __str__(self):
         """Identify each test with the `add_ie` attribute, if available."""
 
         def strclass(cls):
             """From 2.7's unittest; 2.6 had _strclass so we can't import it."""
-            return '%s.%s' % (cls.__module__, cls.__name__)
+            return f'{cls.__module__}.{cls.__name__}'
 
         add_ie = getattr(self, self._testMethodName).add_ie
         return '%s (%s)%s:' % (self._testMethodName,
@@ -92,7 +91,10 @@ class TestDownload(unittest.TestCase):
 def generator(test_case, tname):
 
     def test_template(self):
-        ie = youtube_dl.extractor.get_info_extractor(test_case['name'])()
+        if self.COMPLETED_TESTS.get(tname):
+            return
+        self.COMPLETED_TESTS[tname] = True
+        ie = yt_dlp.extractor.get_info_extractor(test_case['name'])()
         other_ies = [get_info_extractor(ie_key)() for ie_key in test_case.get('add_ie', [])]
         is_playlist = any(k.startswith('playlist') for k in test_case)
         test_cases = test_case.get(
@@ -106,8 +108,13 @@ def generator(test_case, tname):
 
         for tc in test_cases:
             info_dict = tc.get('info_dict', {})
-            if not (info_dict.get('id') and info_dict.get('ext')):
-                raise Exception('Test definition incorrect. The output file cannot be known. Are both \'id\' and \'ext\' keys present?')
+            params = tc.get('params', {})
+            if not info_dict.get('id'):
+                raise Exception('Test definition incorrect. \'id\' key is not present')
+            elif not info_dict.get('ext'):
+                if params.get('skip_download') and params.get('ignore_no_formats_error'):
+                    continue
+                raise Exception('Test definition incorrect. The output file cannot be known. \'ext\' key is not present')
 
         if 'skip' in test_case:
             print_skipping(test_case['skip'])
@@ -121,6 +128,7 @@ def generator(test_case, tname):
         params['outtmpl'] = tname + '_' + params['outtmpl']
         if is_playlist and 'playlist' not in test_case:
             params.setdefault('extract_flat', 'in_playlist')
+            params.setdefault('playlistend', test_case.get('playlist_mincount'))
             params.setdefault('skip_download', True)
 
         ydl = YoutubeDL(params, auto_init=False)
@@ -134,7 +142,7 @@ def generator(test_case, tname):
         expect_warnings(ydl, test_case.get('expected_warnings', []))
 
         def get_tc_filename(tc):
-            return ydl.prepare_filename(tc.get('info_dict', {}))
+            return ydl.prepare_filename(dict(tc.get('info_dict', {})))
 
         res_dict = None
 
@@ -166,7 +174,7 @@ def generator(test_case, tname):
                         report_warning('%s failed due to network errors, skipping...' % tname)
                         return
 
-                    print('Retrying: {0} failed tries\n\n##########\n\n'.format(try_num))
+                    print(f'Retrying: {try_num} failed tries\n\n##########\n\n')
 
                     try_num += 1
                 else:
@@ -232,7 +240,7 @@ def generator(test_case, tname):
                 self.assertTrue(
                     os.path.exists(info_json_fn),
                     'Missing info file %s' % info_json_fn)
-                with io.open(info_json_fn, encoding='utf-8') as infof:
+                with open(info_json_fn, encoding='utf-8') as infof:
                     info_dict = json.load(infof)
                 expect_info_dict(self, info_dict, tc.get('info_dict', {}))
         finally:
@@ -247,16 +255,33 @@ def generator(test_case, tname):
 
 
 # And add them to TestDownload
-for n, test_case in enumerate(defs):
-    tname = 'test_' + str(test_case['name'])
-    i = 1
-    while hasattr(TestDownload, tname):
-        tname = 'test_%s_%d' % (test_case['name'], i)
-        i += 1
+tests_counter = {}
+for test_case in defs:
+    name = test_case['name']
+    i = tests_counter.get(name, 0)
+    tests_counter[name] = i + 1
+    tname = f'test_{name}_{i}' if i else f'test_{name}'
     test_method = generator(test_case, tname)
     test_method.__name__ = str(tname)
     ie_list = test_case.get('add_ie')
     test_method.add_ie = ie_list and ','.join(ie_list)
+    setattr(TestDownload, test_method.__name__, test_method)
+    del test_method
+
+
+def batch_generator(name, num_tests):
+
+    def test_template(self):
+        for i in range(num_tests):
+            getattr(self, f'test_{name}_{i}' if i else f'test_{name}')()
+
+    return test_template
+
+
+for name, num_tests in tests_counter.items():
+    test_method = batch_generator(name, num_tests)
+    test_method.__name__ = f'test_{name}_all'
+    test_method.add_ie = ''
     setattr(TestDownload, test_method.__name__, test_method)
     del test_method
 

@@ -1,19 +1,16 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-from __future__ import unicode_literals
-
-import shutil
-
+#!/usr/bin/env python3
 # Allow direct execution
 import os
+import shutil
 import sys
 import unittest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 from test.helper import FakeYDL
-from youtube_dl.cache import Cache
+
+from yt_dlp.cache import Cache
 
 
 def _is_empty(d):

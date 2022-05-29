@@ -1,22 +1,18 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-from __future__ import unicode_literals
-
+#!/usr/bin/env python3
 # Allow direct execution
 import os
 import sys
 import unittest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-from youtube_dl.compat import (
-    compat_getenv,
-    compat_setenv,
-    compat_etree_Element,
+from yt_dlp import compat
+from yt_dlp.compat import (
     compat_etree_fromstring,
     compat_expanduser,
-    compat_shlex_split,
+    compat_getenv,
+    compat_setenv,
     compat_str,
     compat_struct_unpack,
     compat_urllib_parse_unquote,
@@ -26,13 +22,19 @@ from youtube_dl.compat import (
 
 
 class TestCompat(unittest.TestCase):
+    def test_compat_passthrough(self):
+        with self.assertWarns(DeprecationWarning):
+            compat.compat_basestring
+
+        compat.asyncio.events  # Must not raise error
+
     def test_compat_getenv(self):
         test_str = 'тест'
-        compat_setenv('YOUTUBE_DL_COMPAT_GETENV', test_str)
-        self.assertEqual(compat_getenv('YOUTUBE_DL_COMPAT_GETENV'), test_str)
+        compat_setenv('yt_dlp_COMPAT_GETENV', test_str)
+        self.assertEqual(compat_getenv('yt_dlp_COMPAT_GETENV'), test_str)
 
     def test_compat_setenv(self):
-        test_var = 'YOUTUBE_DL_COMPAT_SETENV'
+        test_var = 'yt_dlp_COMPAT_SETENV'
         test_str = 'тест'
         compat_setenv(test_var, test_str)
         compat_getenv(test_var)
@@ -40,18 +42,12 @@ class TestCompat(unittest.TestCase):
 
     def test_compat_expanduser(self):
         old_home = os.environ.get('HOME')
-        test_str = r'C:\Documents and Settings\тест\Application Data'
-        compat_setenv('HOME', test_str)
-        self.assertEqual(compat_expanduser('~'), test_str)
-        compat_setenv('HOME', old_home or '')
-
-    def test_all_present(self):
-        import youtube_dl.compat
-        all_names = youtube_dl.compat.__all__
-        present_names = set(filter(
-            lambda c: '_' in c and not c.startswith('_'),
-            dir(youtube_dl.compat))) - set(['unicode_literals'])
-        self.assertEqual(all_names, sorted(present_names))
+        test_str = R'C:\Documents and Settings\тест\Application Data'
+        try:
+            compat_setenv('HOME', test_str)
+            self.assertEqual(compat_expanduser('~'), test_str)
+        finally:
+            compat_setenv('HOME', old_home or '')
 
     def test_compat_urllib_parse_unquote(self):
         self.assertEqual(compat_urllib_parse_unquote('abc%20def'), 'abc def')
@@ -86,17 +82,6 @@ class TestCompat(unittest.TestCase):
         self.assertEqual(compat_urllib_parse_urlencode([(b'abc', 'def')]), 'abc=def')
         self.assertEqual(compat_urllib_parse_urlencode([(b'abc', b'def')]), 'abc=def')
 
-    def test_compat_shlex_split(self):
-        self.assertEqual(compat_shlex_split('-option "one two"'), ['-option', 'one two'])
-        self.assertEqual(compat_shlex_split('-option "one\ntwo" \n -flag'), ['-option', 'one\ntwo', '-flag'])
-        self.assertEqual(compat_shlex_split('-val 中文'), ['-val', '中文'])
-
-    def test_compat_etree_Element(self):
-        try:
-            compat_etree_Element.items
-        except AttributeError:
-            self.fail('compat_etree_Element is not a type')
-
     def test_compat_etree_fromstring(self):
         xml = '''
             <root foo="bar" spam="中文">
@@ -105,7 +90,7 @@ class TestCompat(unittest.TestCase):
                 <foo><bar>spam</bar></foo>
             </root>
         '''
-        doc = compat_etree_fromstring(xml.encode('utf-8'))
+        doc = compat_etree_fromstring(xml.encode())
         self.assertTrue(isinstance(doc.attrib['foo'], compat_str))
         self.assertTrue(isinstance(doc.attrib['spam'], compat_str))
         self.assertTrue(isinstance(doc.find('normal').text, compat_str))
