@@ -1,15 +1,8 @@
-# coding: utf-8
-from __future__ import unicode_literals
-
 import json
 import re
 
 from .common import InfoExtractor
 
-from ..compat import (
-    compat_parse_qs,
-    compat_urlparse,
-)
 from ..utils import (
     ExtractorError,
     update_url_query,
@@ -25,40 +18,27 @@ class SafariBaseIE(InfoExtractor):
 
     LOGGED_IN = False
 
-    def _real_initialize(self):
-        self._login()
+    def is_logged_in(self):
+        self.LOGGED_IN = bool(self._request_webpage(
+            'https://api.oreilly.com/api/v2/me/', None, note='Checking if logged in',
+            fatal=False, errnote=False, headers={'Accept': 'application/json'}))
+        return self.LOGGED_IN
 
-    def _login(self):
-        username, password = self._get_login_info()
-        if username is None:
+    def _initialize_pre_login(self):
+        self.is_logged_in()
+
+    def _perform_login(self, username, password):
+
+        if self.LOGGED_IN:
             return
-
-        _, urlh = self._download_webpage_handle(
-            'https://learning.oreilly.com/accounts/login-check/', None,
-            'Downloading login page')
-
-        def is_logged(urlh):
-            return 'learning.oreilly.com/home/' in urlh.geturl()
-
-        if is_logged(urlh):
-            self.LOGGED_IN = True
-            return
-
-        redirect_url = urlh.geturl()
-        parsed_url = compat_urlparse.urlparse(redirect_url)
-        qs = compat_parse_qs(parsed_url.query)
-        next_uri = compat_urlparse.urljoin(
-            'https://api.oreilly.com', qs['next'][0])
 
         auth, urlh = self._download_json_handle(
             'https://www.oreilly.com/member/auth/login/', None, 'Logging in',
             data=json.dumps({
                 'email': username,
-                'password': password,
-                'redirect_uri': next_uri,
+                'password': password
             }).encode(), headers={
-                'Content-Type': 'application/json',
-                'Referer': redirect_url,
+                'Content-Type': 'application/json'
             }, expected_status=400)
 
         credentials = auth.get('credentials')
@@ -72,14 +52,8 @@ class SafariBaseIE(InfoExtractor):
         for cookie in ('groot_sessionid', 'orm-jwt', 'orm-rt'):
             self._apply_first_set_cookie_header(urlh, cookie)
 
-        _, urlh = self._download_webpage_handle(
-            auth.get('redirect_uri') or next_uri, None, 'Completing login',)
-
-        if is_logged(urlh):
-            self.LOGGED_IN = True
-            return
-
-        raise ExtractorError('Unable to log in')
+        if not self.is_logged_in():
+            raise ExtractorError('Unable to log in')
 
 
 class SafariIE(SafariBaseIE):
@@ -96,7 +70,7 @@ class SafariIE(SafariBaseIE):
 
     _TESTS = [{
         'url': 'https://www.safaribooksonline.com/library/view/hadoop-fundamentals-livelessons/9780133392838/part00.html',
-        'md5': 'dcc5a425e79f2564148652616af1f2a3',
+        'md5': '592d0e6d0b03d9b981b3f7306ffc5ca9',
         'info_dict': {
             'id': '0_qbqx90ic',
             'ext': 'mp4',
@@ -104,6 +78,9 @@ class SafariIE(SafariBaseIE):
             'timestamp': 1437758058,
             'upload_date': '20150724',
             'uploader_id': 'stork',
+            'duration': 149,
+            'view_count': int,
+            'thumbnail': 'http://cfvod.kaltura.com/p/1926081/sp/192608100/thumbnail/entry_id/0_qbqx90ic/version/100000'
         },
     }, {
         # non-digits in course id
@@ -127,7 +104,8 @@ class SafariIE(SafariBaseIE):
     _UICONF_ID = '29375172'
 
     def _real_extract(self, url):
-        mobj = re.match(self._VALID_URL, url)
+        entry_id = ''
+        mobj = self._match_valid_url(url)
 
         reference_id = mobj.group('reference_id')
         if reference_id:
@@ -144,7 +122,12 @@ class SafariIE(SafariBaseIE):
             if not reference_id:
                 reference_id = self._search_regex(
                     r'data-reference-id=(["\'])(?P<id>(?:(?!\1).)+)\1',
-                    webpage, 'kaltura reference id', group='id')
+                    webpage, 'kaltura reference id', default='', group='id')
+                entry_id = self._search_regex(
+                    r'data-entry-id=(["\'])(?P<id>(?:(?!\1).)+)\1',
+                    webpage, 'kaltura entry id', default='', group='id')
+                if not any((entry_id, reference_id)):
+                    raise ExtractorError('Unable to find kaltura "reference id" or "entry id"')
             partner_id = self._search_regex(
                 r'data-partner-id=(["\'])(?P<id>(?:(?!\1).)+)\1',
                 webpage, 'kaltura widget id', default=self._PARTNER_ID,
@@ -155,9 +138,10 @@ class SafariIE(SafariBaseIE):
                 group='id')
 
         query = {
-            'wid': '_%s' % partner_id,
+            'wid': f'_{partner_id}',
             'uiconf_id': ui_id,
-            'flashvars[referenceId]': reference_id,
+            'entry_id': entry_id,
+            'flashvars[referenceId]': reference_id
         }
 
         if self.LOGGED_IN:
@@ -189,14 +173,16 @@ class SafariApiIE(SafariBaseIE):
     }]
 
     def _real_extract(self, url):
-        mobj = re.match(self._VALID_URL, url)
+        mobj = self._match_valid_url(url)
         part = self._download_json(
             url, '%s/%s' % (mobj.group('course_id'), mobj.group('part')),
             'Downloading part JSON')
-        part['web_url'] = part['asset_base_url'].replace('library/view',
-                                                         'videos') +\
-            part['videoclips'][0]['reference_id'] + '/'
-        return self.url_result(part['web_url'], SafariIE.ie_key())
+        web_url = part['web_url']
+        if 'library/view' in web_url:
+            web_url = web_url.replace('library/view', 'videos')
+            natural_keys = part['natural_key']
+            web_url = f'{web_url.rsplit("/", 1)[0]}/{natural_keys[0]}-{natural_keys[1][:-5]}'
+        return self.url_result(web_url, SafariIE.ie_key())
 
 
 class SafariCourseIE(SafariBaseIE):
