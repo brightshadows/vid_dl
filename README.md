@@ -1,6 +1,7 @@
 ## Prerequisite
 - Must have an account associated with https://www.oreilly.com/
 - Also functional with a trial account with https://www.oreilly.com/
+- Mac/Linux Environment
 
 ## Getting started
 1. git clone this repo
@@ -15,9 +16,15 @@ Sample URL format to populate the `batch-file.txt`
 https://learning.oreilly.com/videos/bash-shell-scripting/9780137689064/
 
 ```
-4. Once completed execute the command below (whilst in the `vid_dl` directory) to automate the DL.
+4. Make the file `yt-dlp.sh` executable
+
 ```
-python3 -m youtube_dl -u <EMAIL_OREILLY_ACCOUNT> -p <PW> -a batch-file.txt -o '%(playlist)s/%(playlist_index)s - %(title)s.%(ext)s'
+chmod +x yt-dlp.sh
+```
+
+5. Once completed execute the command below (whilst in the `vid_dl` directory) to automate the DL.
+```
+./yt-dlp.sh -u <EMAIL_OREILLY_ACCOUNT> -p <PW> -a batch-file.txt -o '%(playlist)s/%(playlist_index)s - %(title)s.%(ext)s'
 ```
 Where the following notation are:
 * **-u** specify email account that is associated https://www.oreilly.com/
@@ -26,7 +33,7 @@ Where the following notation are:
 * **-o** this specifies the particular format to rename the videos. Recommended to not modify this.
 Sample command:
 ```
-python3 -m youtube_dl -u hello-world@hotmail.com -p hello! -a batch-file.txt -o '%(playlist)s/%(playlist_index)s - %(title)s.%(ext)s'
+./yt-dlp.sh -u hello-world@hotmail.com -p hello! -a batch-file.txt -o '%(playlist)s/%(playlist_index)s - %(title)s.%(ext)s'
 ```
 
 Expecta similar output below:
