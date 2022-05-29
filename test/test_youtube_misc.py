@@ -1,14 +1,13 @@
-#!/usr/bin/env python
-from __future__ import unicode_literals
-
+#!/usr/bin/env python3
 # Allow direct execution
 import os
 import sys
 import unittest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-from youtube_dl.extractor import YoutubeIE
+from yt_dlp.extractor import YoutubeIE
 
 
 class TestYoutubeMisc(unittest.TestCase):

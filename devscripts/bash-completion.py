@@ -1,14 +1,12 @@
-#!/usr/bin/env python
-from __future__ import unicode_literals
-
+#!/usr/bin/env python3
 import os
-from os.path import dirname as dirn
 import sys
 
-sys.path.insert(0, dirn(dirn((os.path.abspath(__file__)))))
-import youtube_dl
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-BASH_COMPLETION_FILE = "youtube-dl.bash-completion"
+import yt_dlp
+
+BASH_COMPLETION_FILE = "completions/bash/yt-dlp"
 BASH_COMPLETION_TEMPLATE = "devscripts/bash-completion.in"
 
 
@@ -26,5 +24,5 @@ def build_completion(opt_parser):
         f.write(filled_template)
 
 
-parser = youtube_dl.parseOpts()[0]
+parser = yt_dlp.parseOpts(ignore_config_files=True)[0]
 build_completion(parser)

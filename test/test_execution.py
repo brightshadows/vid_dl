@@ -1,16 +1,13 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-from __future__ import unicode_literals
-
-import unittest
-
-import sys
+#!/usr/bin/env python3
+import contextlib
 import os
 import subprocess
+import sys
+import unittest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from youtube_dl.utils import encodeArgument
+from yt_dlp.utils import encodeArgument
 
 rootDir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -23,31 +20,28 @@ except AttributeError:
 
 class TestExecution(unittest.TestCase):
     def test_import(self):
-        subprocess.check_call([sys.executable, '-c', 'import youtube_dl'], cwd=rootDir)
+        subprocess.check_call([sys.executable, '-c', 'import yt_dlp'], cwd=rootDir)
 
     def test_module_exec(self):
-        if sys.version_info >= (2, 7):  # Python 2.6 doesn't support package execution
-            subprocess.check_call([sys.executable, '-m', 'youtube_dl', '--version'], cwd=rootDir, stdout=_DEV_NULL)
+        subprocess.check_call([sys.executable, '-m', 'yt_dlp', '--ignore-config', '--version'], cwd=rootDir, stdout=_DEV_NULL)
 
     def test_main_exec(self):
-        subprocess.check_call([sys.executable, 'youtube_dl/__main__.py', '--version'], cwd=rootDir, stdout=_DEV_NULL)
+        subprocess.check_call([sys.executable, 'yt_dlp/__main__.py', '--ignore-config', '--version'], cwd=rootDir, stdout=_DEV_NULL)
 
     def test_cmdline_umlauts(self):
         p = subprocess.Popen(
-            [sys.executable, 'youtube_dl/__main__.py', encodeArgument('ä'), '--version'],
+            [sys.executable, 'yt_dlp/__main__.py', '--ignore-config', encodeArgument('ä'), '--version'],
             cwd=rootDir, stdout=_DEV_NULL, stderr=subprocess.PIPE)
         _, stderr = p.communicate()
         self.assertFalse(stderr)
 
     def test_lazy_extractors(self):
         try:
-            subprocess.check_call([sys.executable, 'devscripts/make_lazy_extractors.py', 'youtube_dl/extractor/lazy_extractors.py'], cwd=rootDir, stdout=_DEV_NULL)
+            subprocess.check_call([sys.executable, 'devscripts/make_lazy_extractors.py', 'yt_dlp/extractor/lazy_extractors.py'], cwd=rootDir, stdout=_DEV_NULL)
             subprocess.check_call([sys.executable, 'test/test_all_urls.py'], cwd=rootDir, stdout=_DEV_NULL)
         finally:
-            try:
-                os.remove('youtube_dl/extractor/lazy_extractors.py')
-            except (IOError, OSError):
-                pass
+            with contextlib.suppress(OSError):
+                os.remove('yt_dlp/extractor/lazy_extractors.py')
 
 
 if __name__ == '__main__':

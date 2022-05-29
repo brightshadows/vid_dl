@@ -1,22 +1,16 @@
-#!/usr/bin/env python
-
-from __future__ import unicode_literals
-
+#!/usr/bin/env python3
 # Allow direct execution
+import collections
 import os
 import sys
 import unittest
-import collections
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 from test.helper import gettestcases
 
-from youtube_dl.extractor import (
-    FacebookIE,
-    gen_extractors,
-    YoutubeIE,
-)
+from yt_dlp.extractor import FacebookIE, YoutubeIE, gen_extractors
 
 
 class TestAllURLsMatching(unittest.TestCase):
@@ -35,8 +29,9 @@ class TestAllURLsMatching(unittest.TestCase):
         assertPlaylist('ECUl4u3cNGP61MdtwGTqZA0MreSaDybji8')
         assertPlaylist('UUBABnxM4Ar9ten8Mdjj1j0Q')  # 585
         assertPlaylist('PL63F0C78739B09958')
+        assertTab('https://www.youtube.com/AsapSCIENCE')
+        assertTab('https://www.youtube.com/embedded')
         assertTab('https://www.youtube.com/playlist?list=UUBABnxM4Ar9ten8Mdjj1j0Q')
-        assertTab('https://www.youtube.com/course?list=ECUl4u3cNGP61MdtwGTqZA0MreSaDybji8')
         assertTab('https://www.youtube.com/playlist?list=PLwP_SiAcdui0KVebT0mU9Apz359a4ubsC')
         assertTab('https://www.youtube.com/watch?v=AV6J6_AeFEQ&playnext=1&list=PL4023E734DA416012')  # 668
         self.assertFalse('youtube:playlist' in self.matching_ies('PLtS2H6bU1M'))
@@ -47,7 +42,7 @@ class TestAllURLsMatching(unittest.TestCase):
         self.assertTrue(YoutubeIE.suitable('PLtS2H6bU1M'))
         self.assertFalse(YoutubeIE.suitable('https://www.youtube.com/watch?v=AV6J6_AeFEQ&playnext=1&list=PL4023E734DA416012'))  # 668
         self.assertMatch('http://youtu.be/BaW_jenozKc', ['youtube'])
-        self.assertMatch('http://www.youtube.com/v/BaW_jenozKc', ['youtube'])
+        # self.assertMatch('http://www.youtube.com/v/BaW_jenozKc', ['youtube'])  # /v/ is no longer valid
         self.assertMatch('https://youtube.googleapis.com/v/BaW_jenozKc', ['youtube'])
         self.assertMatch('http://www.cleanvideosearch.com/media/action/yt/watch?videoId=8v_4O44sfjM', ['youtube'])
 
@@ -66,9 +61,9 @@ class TestAllURLsMatching(unittest.TestCase):
         self.assertMatch('https://www.youtube.com/feed/watch_later', ['youtube:tab'])
         self.assertMatch('https://www.youtube.com/feed/subscriptions', ['youtube:tab'])
 
-    # def test_youtube_search_matching(self):
-    #     self.assertMatch('http://www.youtube.com/results?search_query=making+mustard', ['youtube:search_url'])
-    #     self.assertMatch('https://www.youtube.com/results?baz=bar&search_query=youtube-dl+test+video&filters=video&lclk=video', ['youtube:search_url'])
+    def test_youtube_search_matching(self):
+        self.assertMatch('http://www.youtube.com/results?search_query=making+mustard', ['youtube:search_url'])
+        self.assertMatch('https://www.youtube.com/results?baz=bar&search_query=youtube-dl+test+video&filters=video&lclk=video', ['youtube:search_url'])
 
     def test_facebook_matching(self):
         self.assertTrue(FacebookIE.suitable('https://www.facebook.com/Shiniknoh#!/photo.php?v=10153317450565268'))
@@ -80,11 +75,11 @@ class TestAllURLsMatching(unittest.TestCase):
             url = tc['url']
             for ie in ies:
                 if type(ie).__name__ in ('GenericIE', tc['name'] + 'IE'):
-                    self.assertTrue(ie.suitable(url), '%s should match URL %r' % (type(ie).__name__, url))
+                    self.assertTrue(ie.suitable(url), f'{type(ie).__name__} should match URL {url!r}')
                 else:
                     self.assertFalse(
                         ie.suitable(url),
-                        '%s should not match URL %r . That URL belongs to %s.' % (type(ie).__name__, url, tc['name']))
+                        f'{type(ie).__name__} should not match URL {url!r} . That URL belongs to {tc["name"]}.')
 
     def test_keywords(self):
         self.assertMatch(':ytsubs', ['youtube:subscriptions'])
@@ -119,7 +114,7 @@ class TestAllURLsMatching(unittest.TestCase):
         for (ie_name, ie_list) in name_accu.items():
             self.assertEqual(
                 len(ie_list), 1,
-                'Multiple extractors with the same IE_NAME "%s" (%s)' % (ie_name, ', '.join(ie_list)))
+                f'Multiple extractors with the same IE_NAME "{ie_name}" ({", ".join(ie_list)})')
 
 
 if __name__ == '__main__':
