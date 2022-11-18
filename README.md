@@ -68,18 +68,18 @@ Expecta similar output below:
 ## Getting started with LinkedIn Learning
 1. How to get a valid cookies.txt file
 
-    Install Firefox with this Plugin https://addons.mozilla.org/en-US/firefox/addon/cookies-txt/
-    Use Firefox to login to linkedin:learning
-    Play a learning video e.g. on this page. https://www.linkedin.com/learning/python-essential-training-2/hello-world?u=2251738
-    Use the plugin to export the file `cookies.txt`
+   - Install Firefox with this Plugin https://addons.mozilla.org/en-US/firefox/addon/cookies-txt/
+   - Use Firefox to login to linkedin:learning
+   - Play a learning video e.g. on this page. https://www.linkedin.com/learning/python-essential-training-2/hello-world?u=2251738
+   - Use the plugin to export the file `cookies.txt`
     
  2. How to get the "x-li-identity” header value
 
 
-    In Firefox press Ctrl-Shift-E to open the Network Monitor TAB (development console).
-    Reload the linkedin:learning page with the video.
-    In the Network Monitor, search for “urn”, and click on one of the lines with the HTTP requests. (the naming of it will be somthing like this `urn%3Ali%3AenterpriseAccount%`
-    Scroll down to the very bottom and you will see request header line “x-li-identity: dX...”, and copy the value to your command line option: --add-header "x-li-identity:..."
+   - In Firefox press Ctrl-Shift-E to open the Network Monitor TAB (development console).
+   - Reload the linkedin:learning page with the video.
+   - In the Network Monitor, search for “urn”, and click on one of the lines with the HTTP requests. (the naming of it will be somthing like this `urn%3Ali%3AenterpriseAccount%`
+   - Scroll down to the very bottom and you will see request header line “x-li-identity: dX...”, and copy the value to your command line option: --add-header "x-li-identity:..."
     
    3. Execute the command to download:
    ```
